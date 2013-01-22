@@ -17,6 +17,7 @@
 #include <config.h>
 #include <includes.h>
 #include <radvd.h>
+#include <sys/ioctl.h> /* ioctl */
 
 int
 recv_rs_ra(int sock, unsigned char *msg, struct sockaddr_in6 *addr,
@@ -29,6 +30,8 @@ recv_rs_ra(int sock, unsigned char *msg, struct sockaddr_in6 *addr,
 	static unsigned int chdrlen = 0;
 	int len;
 	fd_set rfds;
+	
+	int fd;
 
 	if( ! chdr )
 	{
@@ -71,10 +74,21 @@ recv_rs_ra(int sock, unsigned char *msg, struct sockaddr_in6 *addr,
 			
 		return len;
 	}
-
+	
 	*hoplimit = 255;
 
-        for (cmsg = CMSG_FIRSTHDR(&mhdr); cmsg != NULL; cmsg = CMSG_NXTHDR(&mhdr, cmsg))
+    /* shortterm workaround to get hop limit , Bob, 07/21/2009*/ 	
+	fd = open("/dev/acos_nat_cli", O_RDWR);
+
+    if(fd)
+    {
+		/*Fix wrong ioctl command*/
+        ioctl(fd, _IOR(100, 174, char *), hoplimit);
+        close(fd);
+    }
+    /* end of shortterm workaround to get hop limit , Bob, 07/21/2009*/ 	
+
+    for (cmsg = CMSG_FIRSTHDR(&mhdr); cmsg != NULL; cmsg = CMSG_NXTHDR(&mhdr, cmsg))
 	{
           if (cmsg->cmsg_level != IPPROTO_IPV6)
           	continue;
@@ -87,6 +101,7 @@ recv_rs_ra(int sock, unsigned char *msg, struct sockaddr_in6 *addr,
                     (*(int *)CMSG_DATA(cmsg) >= 0) && 
                     (*(int *)CMSG_DATA(cmsg) < 256))
                 {
+                  
                   *hoplimit = *(int *)CMSG_DATA(cmsg);
                 }
                 else

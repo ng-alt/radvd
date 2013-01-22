@@ -88,6 +88,8 @@ send_ra(int sock, struct Interface *iface, struct in6_addr *dest)
 	size_t len = 0;
 	ssize_t err;
 
+	unsigned long sec_since_initial_advert = 0; 
+	unsigned long remain_lifetime = 0; 
 	/* First we need to check that the interface hasn't been removed or deactivated */
 	if(check_device(sock, iface) < 0) {
 		if (iface->IgnoreIfMissing)  /* a bit more quiet warning message.. */
@@ -112,7 +114,10 @@ send_ra(int sock, struct Interface *iface, struct in6_addr *dest)
 
 	dlog(LOG_DEBUG, 3, "sending RA on %s", iface->Name);
 
-	if (dest == NULL)
+    /* IPv6 Self Test v5.0.0 always assume the RA is multicast */
+	//if ((dest == NULL) || 
+	  //      ( (dest->s6_addr32[0]==0) && (dest->s6_addr32[1]==0) && (dest->s6_addr32[2]==0) && (dest->s6_addr32[3]==0)) ) /* IPv6Ready- Test v6LC.2.2.9: Processing Router Solicitations, Bob added 07/15/2009 */
+    if (1)
 	{
 		struct timeval tv;
 
@@ -162,6 +167,13 @@ send_ra(int sock, struct Interface *iface, struct in6_addr *dest)
 
 	while(prefix)
 	{
+        /* Router advertisment should not have obsolete prefix information for nornam RA */
+        if(iface->init_racount>=MAX_INITIAL_RTR_ADVERTISEMENTS && htonl(prefix->AdvValidLifetime)==0)
+        {
+            prefix = prefix->next;
+            continue;
+        }
+
 		if( prefix->enabled )
 		{
 			struct nd_opt_prefix_info *pinfo;
@@ -181,7 +193,34 @@ send_ra(int sock, struct Interface *iface, struct in6_addr *dest)
 				(prefix->AdvRouterAddr)?ND_OPT_PI_FLAG_RADDR:0;
 
 			pinfo->nd_opt_pi_valid_time	= htonl(prefix->AdvValidLifetime);
+			/* Advertise the remaining lifetime (in DHCP mode)
+			 * WNDR4500v2 TD#14: make sure obselete prefices are still sent
+			 */
+			//if (use_dynamic_lifetime) {
+			if (use_dynamic_lifetime && htonl(prefix->AdvValidLifetime)) {
+				sec_since_initial_advert = get_current_time() - initial_advert_time;
+				if (sec_since_initial_advert >= prefix->AdvValidLifetime) {
+					/* prefix expired, do not advertise */
+					prefix = prefix->next;
+					continue;
+				}
+				/* Advertise the remaining lifetime */
+				remain_lifetime = prefix->AdvValidLifetime - sec_since_initial_advert;
+				pinfo->nd_opt_pi_valid_time = htonl(remain_lifetime);
+			}
 			pinfo->nd_opt_pi_preferred_time = htonl(prefix->AdvPreferredLifetime);
+			/* Modify the "preferred lifetime" behaviour per Netgear request. 
+			 * WNDR4500v2 TD#14: make sure obselete prefices are still sent
+			 */
+			//if (use_dynamic_lifetime) {
+			if (use_dynamic_lifetime && htonl(prefix->AdvPreferredLifetime)) {
+				if (sec_since_initial_advert >= prefix->AdvPreferredLifetime)
+					pinfo->nd_opt_pi_preferred_time = htonl(0);
+				else {
+					remain_lifetime = prefix->AdvPreferredLifetime - sec_since_initial_advert;
+					pinfo->nd_opt_pi_preferred_time = htonl(remain_lifetime);
+				}
+			}
 			pinfo->nd_opt_pi_reserved2	= 0;
 			
 			memcpy(&pinfo->nd_opt_pi_prefix, &prefix->Prefix,

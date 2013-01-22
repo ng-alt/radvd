@@ -32,7 +32,7 @@ process(int sock, struct Interface *ifacel, unsigned char *msg, int len,
 	struct Interface *iface;
 	struct icmp6_hdr *icmph;
 	char addr_str[INET6_ADDRSTRLEN];
-
+	
 	if ( ! pkt_info )
 	{
 		flog(LOG_WARNING, "received packet with no pkt_info!" );

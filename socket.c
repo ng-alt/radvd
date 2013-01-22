@@ -79,12 +79,14 @@ open_icmpv6_socket(void)
 
 #ifdef IPV6_RECVHOPLIMIT
 	val = 1;
+	
 	err = setsockopt(sock, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, &val, sizeof(val));
 	if (err < 0)
 	{
 		flog(LOG_ERR, "setsockopt(IPV6_RECVHOPLIMIT): %s", strerror(errno));
 		return (-1);
 	}
+	
 #endif
 
 	/*

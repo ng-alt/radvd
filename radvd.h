@@ -179,6 +179,10 @@ int yylex(void);
 int check_ip6_forwarding(void);
 void reload_config(void);
 
+extern int use_dynamic_lifetime;
+extern unsigned long initial_advert_time;
+extern void set_initial_advert_time(void);
+extern unsigned long get_current_time(void);
 /* timer.c */
 void set_timer(struct timer_lst *tm, double);
 void clear_timer(struct timer_lst *tm);
@@ -255,6 +259,35 @@ int privsep_interface_retranstimer(const char *iface, uint32_t rettimer);
  * 
  * these are placed here because they're needed in all of socket.c, recv.c and send.c
  */
+
+#if 0
+
+#define IPV6_ADDRFORM		1
+#define IPV6_2292PKTINFO	2
+#define IPV6_2292HOPOPTS	3
+#define IPV6_2292DSTOPTS	4
+#define IPV6_2292RTHDR		5
+#define IPV6_2292PKTOPTIONS	6
+#define IPV6_CHECKSUM		7
+#define IPV6_2292HOPLIMIT	8
+#define IPV6_NEXTHOP		9
+
+#define IPV6_RECVPKTINFO	49
+#define IPV6_PKTINFO		50
+#define IPV6_RECVHOPLIMIT	51
+#define IPV6_HOPLIMIT		52
+#define IPV6_RECVHOPOPTS	53
+#define IPV6_HOPOPTS		54
+#define IPV6_RTHDRDSTOPTS	55
+#define IPV6_RECVRTHDR		56
+#define IPV6_RTHDR		57
+#define IPV6_RECVDSTOPTS	58
+#define IPV6_DSTOPTS		59
+
+#endif
+
+//#if 0
+ 
 #ifdef __linux__
 #  if defined IPV6_RECVHOPLIMIT || defined IPV6_RECVPKTINFO
 #    include <linux/version.h>
@@ -272,5 +305,7 @@ int privsep_interface_retranstimer(const char *iface, uint32_t rettimer);
 #    endif
 #  endif
 #endif
+
+//#endif //#if 0
 
 #endif

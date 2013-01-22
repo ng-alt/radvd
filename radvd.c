@@ -65,6 +65,31 @@ int drop_root_privileges(const char *);
 int readin_config(char *);
 int check_conffile_perm(const char *, const char *);
 
+/* WNDR3400v2 Defect#135: Sync radvd prefix lifetime with IAPD lifetime */
+#include <sys/sysinfo.h>
+
+/* Signal handlers SIGUSR1: to reset prefix lifetime 
+ * after a sucessful IAPD renew */
+int sigusr1_received = 0;
+void sigusr1_handler(int sig);
+
+/* Functions to record initial advertise time */
+int use_dynamic_lifetime = 0;
+unsigned long initial_advert_time = 0;
+
+void set_initial_advert_time(void)
+{
+	struct sysinfo info;
+	sysinfo(&info);
+	initial_advert_time = (unsigned long)(info.uptime);
+}
+
+unsigned long get_current_time(void)
+{
+	struct sysinfo info;
+	sysinfo(&info);
+	return (unsigned long)(info.uptime);
+}
 int
 main(int argc, char *argv[])
 {
@@ -94,9 +119,13 @@ main(int argc, char *argv[])
 
 	/* parse args */
 #ifdef HAVE_GETOPT_LONG
-	while ((c = getopt_long(argc, argv, "d:C:l:m:p:t:u:vhs", prog_opt, &opt_idx)) > 0)
+	/* Add option to show advertise real lifetime */
+	/* while ((c = getopt_long(argc, argv, "d:C:l:m:p:t:u:vhs", prog_opt, &opt_idx)) > 0) */
+	while ((c = getopt_long(argc, argv, "d:C:l:m:p:t:u:vhsD", prog_opt, &opt_idx)) > 0)
 #else
-	while ((c = getopt(argc, argv, "d:C:l:m:p:t:u:vhs")) > 0)
+	/* Add option to show advertise real lifetime */
+	/* while ((c = getopt(argc, argv, "d:C:l:m:p:t:u:vhs")) > 0) */
+	while ((c = getopt(argc, argv, "d:C:l:m:p:t:u:vhsD")) > 0)
 #endif
 	{
 		switch (c) {
@@ -153,6 +182,10 @@ main(int argc, char *argv[])
 			break;
 		case 's':
 			singleprocess = 1;
+			break;
+		/* Add option to show advertise dynamic lifetime */
+		case 'D':
+			use_dynamic_lifetime = 1;
 			break;
 		case 'h':
 			usage();
@@ -292,6 +325,7 @@ main(int argc, char *argv[])
 	signal(SIGHUP, sighup_handler);
 	signal(SIGTERM, sigterm_handler);
 	signal(SIGINT, sigint_handler);
+	signal(SIGUSR1, sigusr1_handler);	
 
 	snprintf(pidstr, sizeof(pidstr), "%ld\n", (long)getpid());
 	
@@ -300,6 +334,8 @@ main(int argc, char *argv[])
 	close(fd);
 
 	config_interface();
+	/* Record the time for first advertisement */
+	set_initial_advert_time();
 	kickoff_adverts();
 
 	/* enter loop */
@@ -317,6 +353,15 @@ main(int argc, char *argv[])
 
 		if (sigterm_received || sigint_received) {
 			stop_adverts();
+			
+			/* WNR3500L TD192, Per Netgear spec, 
+			 * need to send RA for 3 times before termination.
+			 */
+			usleep(200000);
+			stop_adverts();
+			usleep(200000);
+			stop_adverts();
+
 			break;
 		}
 
@@ -324,6 +369,13 @@ main(int argc, char *argv[])
 		{
 			reload_config();		
 			sighup_received = 0;
+		}
+		/* Reset the initial advertisement time to now */
+		/* This should happen after a successful IADP renew */
+		if (sigusr1_received)
+		{
+			set_initial_advert_time();
+			sigusr1_received = 0;
 		}
 	}
 	
@@ -343,11 +395,15 @@ timer_handler(void *data)
 
 	next = rand_between(iface->MinRtrAdvInterval, iface->MaxRtrAdvInterval); 
 
-	if (iface->init_racount < MAX_INITIAL_RTR_ADVERTISEMENTS)
+	if (iface->init_racount < MAX_INITIAL_RTR_ADVERTISEMENTS - 1)
 	{
 		iface->init_racount++;
 		next = min(MAX_INITIAL_RTR_ADVERT_INTERVAL, next);
 	}
+    else
+    {
+        iface->init_racount++;
+    } 
 
 	set_timer(&iface->tm, next);
 }
@@ -413,6 +469,7 @@ stop_adverts(void)
 			if (iface->AdvSendAdvert) {
 				/* send a final advertisement with zero Router Lifetime */
 				iface->AdvDefaultLifetime = 0;
+                iface->init_racount = 0;
 				send_ra_forall(sock, iface, NULL);
 			}
 		}
@@ -527,6 +584,13 @@ sigint_handler(int sig)
 	sigint_received = 1;
 }
 
+/* Add signal handler for SIGUSR1, to handle
+ * signal after a successful IAPD renew */
+void sigusr1_handler(int sig)
+{
+	signal(SIGUSR1, sigusr1_handler);
+	sigusr1_received = 1;
+}
 int
 drop_root_privileges(const char *username)
 {
