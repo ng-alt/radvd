@@ -82,8 +82,10 @@ recv_rs_ra(int sock, unsigned char *msg, struct sockaddr_in6 *addr,
 
     if(fd)
     {
+        /*Foxconn modify start by Hank 09/26/2012*/
 		/*Fix wrong ioctl command*/
         ioctl(fd, _IOR(100, 174, char *), hoplimit);
+		/*Foxconn modify end by Hank 09/26/2012*/
         close(fd);
     }
     /* end of shortterm workaround to get hop limit , Bob, 07/21/2009*/ 	

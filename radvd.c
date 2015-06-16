@@ -65,6 +65,7 @@ int drop_root_privileges(const char *);
 int readin_config(char *);
 int check_conffile_perm(const char *, const char *);
 
+/* Foxconn added start pling 12/22/2011 */
 /* WNDR3400v2 Defect#135: Sync radvd prefix lifetime with IAPD lifetime */
 #include <sys/sysinfo.h>
 
@@ -90,6 +91,7 @@ unsigned long get_current_time(void)
 	sysinfo(&info);
 	return (unsigned long)(info.uptime);
 }
+/* Foxconn added end pling 12/22/2011 */
 int
 main(int argc, char *argv[])
 {
@@ -119,13 +121,17 @@ main(int argc, char *argv[])
 
 	/* parse args */
 #ifdef HAVE_GETOPT_LONG
+	/* Foxconn modified start pling 12/22/2011 */
 	/* Add option to show advertise real lifetime */
 	/* while ((c = getopt_long(argc, argv, "d:C:l:m:p:t:u:vhs", prog_opt, &opt_idx)) > 0) */
 	while ((c = getopt_long(argc, argv, "d:C:l:m:p:t:u:vhsD", prog_opt, &opt_idx)) > 0)
+	/* Foxconn modified end pling 12/22/2011 */
 #else
+	/* Foxconn modified start pling 12/22/2011 */
 	/* Add option to show advertise real lifetime */
 	/* while ((c = getopt(argc, argv, "d:C:l:m:p:t:u:vhs")) > 0) */
 	while ((c = getopt(argc, argv, "d:C:l:m:p:t:u:vhsD")) > 0)
+	/* Foxconn modified end pling 12/22/2011 */
 #endif
 	{
 		switch (c) {
@@ -183,10 +189,12 @@ main(int argc, char *argv[])
 		case 's':
 			singleprocess = 1;
 			break;
+		/* Foxconn added start pling 12/22/2011 */
 		/* Add option to show advertise dynamic lifetime */
 		case 'D':
 			use_dynamic_lifetime = 1;
 			break;
+		/* Foxconn added end pling 12/22/2011 */
 		case 'h':
 			usage();
 #ifdef HAVE_GETOPT_LONG
@@ -325,7 +333,7 @@ main(int argc, char *argv[])
 	signal(SIGHUP, sighup_handler);
 	signal(SIGTERM, sigterm_handler);
 	signal(SIGINT, sigint_handler);
-	signal(SIGUSR1, sigusr1_handler);	
+	signal(SIGUSR1, sigusr1_handler);	/* Foxconn added pling 12/22/2011 */
 
 	snprintf(pidstr, sizeof(pidstr), "%ld\n", (long)getpid());
 	
@@ -334,8 +342,10 @@ main(int argc, char *argv[])
 	close(fd);
 
 	config_interface();
+	/* Foxconn added start pling 12/22/2011 */
 	/* Record the time for first advertisement */
 	set_initial_advert_time();
+	/* Foxconn added end pling 12/22/2011 */
 	kickoff_adverts();
 
 	/* enter loop */
@@ -354,6 +364,7 @@ main(int argc, char *argv[])
 		if (sigterm_received || sigint_received) {
 			stop_adverts();
 			
+			/* Foxconn added start pling 11/30/2010 */
 			/* WNR3500L TD192, Per Netgear spec, 
 			 * need to send RA for 3 times before termination.
 			 */
@@ -361,6 +372,7 @@ main(int argc, char *argv[])
 			stop_adverts();
 			usleep(200000);
 			stop_adverts();
+			/* Foxconn added end pling 11/30/2010 */
 
 			break;
 		}
@@ -370,6 +382,7 @@ main(int argc, char *argv[])
 			reload_config();		
 			sighup_received = 0;
 		}
+		/* Foxconn added start pling 12/22/2011 */
 		/* Reset the initial advertisement time to now */
 		/* This should happen after a successful IADP renew */
 		if (sigusr1_received)
@@ -377,6 +390,7 @@ main(int argc, char *argv[])
 			set_initial_advert_time();
 			sigusr1_received = 0;
 		}
+		/* Foxconn added end pling 12/22/2011 */
 	}
 	
 	unlink(pidfile);
@@ -400,10 +414,12 @@ timer_handler(void *data)
 		iface->init_racount++;
 		next = min(MAX_INITIAL_RTR_ADVERT_INTERVAL, next);
 	}
+    /* Foxconn Perry added start, 2011/05/13, for IPv6 obsolete prefix information */
     else
     {
         iface->init_racount++;
-    } 
+    }
+    /* Foxconn Perry added end, 2011/05/13, for IPv6 obsolete prefix information */    
 
 	set_timer(&iface->tm, next);
 }
@@ -469,7 +485,9 @@ stop_adverts(void)
 			if (iface->AdvSendAdvert) {
 				/* send a final advertisement with zero Router Lifetime */
 				iface->AdvDefaultLifetime = 0;
+                /* Foxconn Perry added start, 2011/05/13, for IPv6 obsolete prefix information */
                 iface->init_racount = 0;
+                /* Foxconn Perry added end, 2011/05/13, for IPv6 obsolete prefix information */ 
 				send_ra_forall(sock, iface, NULL);
 			}
 		}
@@ -584,6 +602,7 @@ sigint_handler(int sig)
 	sigint_received = 1;
 }
 
+/* Foxconn added start pling 12/22/2011 */
 /* Add signal handler for SIGUSR1, to handle
  * signal after a successful IAPD renew */
 void sigusr1_handler(int sig)
@@ -591,6 +610,7 @@ void sigusr1_handler(int sig)
 	signal(SIGUSR1, sigusr1_handler);
 	sigusr1_received = 1;
 }
+/* Foxconn added end pling 12/22/2011 */
 int
 drop_root_privileges(const char *username)
 {

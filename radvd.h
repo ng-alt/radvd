@@ -179,10 +179,12 @@ int yylex(void);
 int check_ip6_forwarding(void);
 void reload_config(void);
 
+/* Foxconn added start pling 12/22/2011 */
 extern int use_dynamic_lifetime;
 extern unsigned long initial_advert_time;
 extern void set_initial_advert_time(void);
 extern unsigned long get_current_time(void);
+/* Foxconn added end pling 12/22/2011 */
 /* timer.c */
 void set_timer(struct timer_lst *tm, double);
 void clear_timer(struct timer_lst *tm);

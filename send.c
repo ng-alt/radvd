@@ -88,8 +88,10 @@ send_ra(int sock, struct Interface *iface, struct in6_addr *dest)
 	size_t len = 0;
 	ssize_t err;
 
+	/* Foxconn added start pling 12/22/2011 */
 	unsigned long sec_since_initial_advert = 0; 
 	unsigned long remain_lifetime = 0; 
+	/* Foxconn added end pling 12/22/2011 */
 	/* First we need to check that the interface hasn't been removed or deactivated */
 	if(check_device(sock, iface) < 0) {
 		if (iface->IgnoreIfMissing)  /* a bit more quiet warning message.. */
@@ -114,12 +116,14 @@ send_ra(int sock, struct Interface *iface, struct in6_addr *dest)
 
 	dlog(LOG_DEBUG, 3, "sending RA on %s", iface->Name);
 
+    /* Foxconn modified start pling 11/05/2014 */
     /* IPv6 Self Test v5.0.0 always assume the RA is multicast */
     /* R7000 TD#395, need to restore original code, otherwise some 
      *  Win7/Win8 PC can't get DNS IP properly after reboot */
 	if ((dest == NULL) || 
 	        ( (dest->s6_addr32[0]==0) && (dest->s6_addr32[1]==0) && (dest->s6_addr32[2]==0) && (dest->s6_addr32[3]==0)) ) /* IPv6Ready- Test v6LC.2.2.9: Processing Router Solicitations, Bob added 07/15/2009 */
     //if (1)
+    /* Foxconn modified end pling 11/05/2014 */
 	{
 		struct timeval tv;
 
@@ -169,12 +173,14 @@ send_ra(int sock, struct Interface *iface, struct in6_addr *dest)
 
 	while(prefix)
 	{
+        /* Foxconn Perry added start, 2011/05/13, for IPv6 obsolete prefix information */
         /* Router advertisment should not have obsolete prefix information for nornam RA */
         if(iface->init_racount>=MAX_INITIAL_RTR_ADVERTISEMENTS && htonl(prefix->AdvValidLifetime)==0)
         {
             prefix = prefix->next;
             continue;
         }
+        /* Foxconn Perry added end, 2011/05/13, for IPv6 obsolete prefix information */
 
 		if( prefix->enabled )
 		{
@@ -195,11 +201,13 @@ send_ra(int sock, struct Interface *iface, struct in6_addr *dest)
 				(prefix->AdvRouterAddr)?ND_OPT_PI_FLAG_RADDR:0;
 
 			pinfo->nd_opt_pi_valid_time	= htonl(prefix->AdvValidLifetime);
+			/* Foxconn modified start pling 09/25/2011 */
 			/* Advertise the remaining lifetime (in DHCP mode)
 			 * WNDR4500v2 TD#14: make sure obselete prefices are still sent
 			 */
 			//if (use_dynamic_lifetime) {
 			if (use_dynamic_lifetime && htonl(prefix->AdvValidLifetime)) {
+			/* Foxconn modified end pling 09/25/2012 */
 				sec_since_initial_advert = get_current_time() - initial_advert_time;
 				if (sec_since_initial_advert >= prefix->AdvValidLifetime) {
 					/* prefix expired, do not advertise */
@@ -210,12 +218,15 @@ send_ra(int sock, struct Interface *iface, struct in6_addr *dest)
 				remain_lifetime = prefix->AdvValidLifetime - sec_since_initial_advert;
 				pinfo->nd_opt_pi_valid_time = htonl(remain_lifetime);
 			}
+			/* Foxconn added end pling 12/22/2011 */
 			pinfo->nd_opt_pi_preferred_time = htonl(prefix->AdvPreferredLifetime);
+			/* Foxconn modified start pling 09/25/2012 */
 			/* Modify the "preferred lifetime" behaviour per Netgear request. 
 			 * WNDR4500v2 TD#14: make sure obselete prefices are still sent
 			 */
 			//if (use_dynamic_lifetime) {
 			if (use_dynamic_lifetime && htonl(prefix->AdvPreferredLifetime)) {
+			/* Foxconn modified end pling 09/25/2012 */
 				if (sec_since_initial_advert >= prefix->AdvPreferredLifetime)
 					pinfo->nd_opt_pi_preferred_time = htonl(0);
 				else {
@@ -223,6 +234,7 @@ send_ra(int sock, struct Interface *iface, struct in6_addr *dest)
 					pinfo->nd_opt_pi_preferred_time = htonl(remain_lifetime);
 				}
 			}
+			/* Foxconn added end pling 12/29/2011 */
 			pinfo->nd_opt_pi_reserved2	= 0;
 			
 			memcpy(&pinfo->nd_opt_pi_prefix, &prefix->Prefix,
