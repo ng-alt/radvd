@@ -45,6 +45,9 @@ BUILT_SOURCES = device.c
 CLEANFILES = radvd.8 radvdump.8 radvd.conf.5
 DISTCLEANFILES = device.c
 
+scanner.c: gram.h
+gram.h: gram.c
+
 SUFFIXES = .man
 
 .man:
